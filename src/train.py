@@ -16,7 +16,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Hyperparameters
 batch_size = 64
-epochs = 3
+epochs = 20
 
 # Modify images to be compatible with ResNet50
 transform = transforms.Compose([
@@ -51,7 +51,7 @@ model = transfer_model(num_classes=94).to(device=device)
 optimizer = optim.AdamW(model.fc.parameters(), lr=0.001)
 
 # Compile model for your GPU's hardware layout
-model = torch.compile(model)
+model = torch.compile(model, mode="reduce-overhead")
 
 # Works well for multiclass classification, as it punishes high confidence wrong predictions
 loss_function = nn.CrossEntropyLoss()
@@ -61,6 +61,7 @@ scaler = torch.amp.GradScaler('cuda')
 
 print(f"Start training on {device} ({torch.cuda.get_device_name(0)})\n")
 start_time = time.time()
+best_accuracy = 0.0
 
 for epoch in range(epochs):
     model.train()
@@ -107,6 +108,13 @@ for epoch in range(epochs):
 
     test_accuracy = 100 * correct / total
     print(f"Epoch {epoch+1} Test Accuracy: {test_accuracy:.2f}%\n")
+
+    if test_accuracy > best_accuracy:
+        best_accuracy = test_accuracy
+        print("New best accuracy! Saving model...\n")
+        torch.save(model.state_dict(), "./models/best_mushroom_roulette.pth")
+    else:
+        print("\n")
 
 total_time = time.time() - start_time
 print(f"\nTraining Complete in {total_time/60:.2f} minutes\n")
