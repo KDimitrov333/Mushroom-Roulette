@@ -5,6 +5,7 @@ import torchvision
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 from torch.utils.data import random_split
+from torch.utils.data import Subset
 from PIL import ImageFile
 import time
 
@@ -18,20 +19,46 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 batch_size = 64
 epochs = 20
 
-# Modify images to be compatible with ResNet50
-transform = transforms.Compose([
-    transforms.Resize((224, 224)), # ResNet50 desired resolution
+# Radical changes to training data to fight overfitting
+train_transform = transforms.Compose([
+    # Random zooms and cropping of images
+    transforms.RandomResizedCrop(224, scale=(0.8, 1.0)),
+
+    # 50% chance to mirror the image
+    transforms.RandomHorizontalFlip(p=0.5),
+
+    # Random rotation of image up to 30 degrees
+    transforms.RandomRotation(degrees=30),
+
+    # Mess with lighting
+    transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
+
     transforms.ToTensor(),
+
     # Shift colors to fit ResNet50 training data values
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
 
-dataset = torchvision.datasets.ImageFolder(root='./data/raw_mushrooms/MO_94/', transform=transform)
+# Modify test images just enough to be compatible with ResNet50
+test_transform = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+])
 
-train_size = int(0.8 * len(dataset))
-test_size = len(dataset) - train_size
+full_train_dataset = torchvision.datasets.ImageFolder(root='./data/raw_mushrooms/MO_94/', transform=train_transform)
+full_test_dataset = torchvision.datasets.ImageFolder(root='./data/raw_mushrooms/MO_94/', transform=test_transform)
 
-train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
+num_data = len(full_train_dataset)
+train_size = int(0.8 * num_data)
+
+# Random list of index numbers; lock seed for consistency
+generator = torch.Generator().manual_seed(67)
+indices = torch.randperm(num_data, generator=generator).tolist()
+
+# Separate training data from test data
+train_dataset = Subset(full_train_dataset, indices[:train_size])
+test_dataset = Subset(full_test_dataset, indices[train_size:])
 
 # CPU Optimizations to avoid data bottlenecks
 train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, 
