@@ -24,6 +24,16 @@ def transfer_model(num_classes=94):
 
     return model
 
+def defrost_top_layers(model):
+    '''Unfreezes layer4 of transferred ResNet50 so it can learn on the mushroom set'''
+
+    for name, param in model.named_parameters():
+        if "layer4" in name:
+            param.requires_grad = True
+
+    return model
+
+
 if __name__ == "__main__":
     test_model = transfer_model(94)
     print(test_model.fc)
