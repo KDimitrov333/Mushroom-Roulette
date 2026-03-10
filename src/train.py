@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 import torchvision
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
-from torch.utils.data import random_split
 from torch.utils.data import Subset
 from PIL import ImageFile
 import time
@@ -17,7 +17,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Hyperparameters
 batch_size = 64
-epochs = 20
+epochs = 30
 
 # Radical changes to training data to fight overfitting
 train_transform = transforms.Compose([
@@ -76,6 +76,9 @@ model = transfer_model(num_classes=94).to(device=device)
 
 # Pass only final layer parameters to optimizer
 optimizer = optim.AdamW(model.fc.parameters(), lr=0.001)
+
+# Lower learning rate as accuracy gains slow down
+scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=2)
 
 # Compile model for your GPU's hardware layout
 model = torch.compile(model, mode="reduce-overhead")
@@ -142,6 +145,11 @@ for epoch in range(epochs):
         torch.save(model.state_dict(), "./models/best_mushroom_roulette.pth")
     else:
         print("\n")
+
+    scheduler.step(test_accuracy)
+
+    current_lr = optimizer.param_groups[0]['lr']
+    print(f"Current Learning Rate for next epoch: {current_lr:.6f}\n")
 
 total_time = time.time() - start_time
 print(f"\nTraining Complete in {total_time/60:.2f} minutes\n")
