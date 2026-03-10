@@ -9,7 +9,7 @@ from torch.utils.data import Subset
 from PIL import ImageFile
 import time
 
-from model import transfer_model
+from model import transfer_model, defrost_top_layers
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -74,8 +74,22 @@ test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=Fa
 print("Initializing and compiling model...\n")
 model = transfer_model(num_classes=94).to(device=device)
 
-# Pass only final layer parameters to optimizer
-optimizer = optim.AdamW(model.fc.parameters(), lr=0.001)
+print("Loading weights from highest accuracy model from training...")
+saved_state_dict = torch.load("./models/resnet50_best_mushroom_roulette.pth", weights_only=True)
+
+# Clean weight names from torch.compile prefixes
+clean_state_dict = {}
+for key, value in saved_state_dict.items():
+    clean_key = key.replace('_orig_mod.', '')
+    clean_state_dict[clean_key] = value
+
+model.load_state_dict(clean_state_dict)
+
+# Unfreeze top layer
+model = defrost_top_layers(model)
+
+# Pass final + unfrozen layer parameters to optimizer; lower learning rate
+optimizer = optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=0.00005)
 
 # Lower learning rate as accuracy gains slow down
 scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=2)
@@ -91,7 +105,9 @@ scaler = torch.amp.GradScaler('cuda')
 
 print(f"Start training on {device} ({torch.cuda.get_device_name(0)})\n")
 start_time = time.time()
-best_accuracy = 0.0
+
+# Current highest accuracy from non-fine-tuned model
+best_accuracy = 63.61
 
 for epoch in range(epochs):
     model.train()
@@ -142,7 +158,7 @@ for epoch in range(epochs):
     if test_accuracy > best_accuracy:
         best_accuracy = test_accuracy
         print("New best accuracy! Saving model...\n")
-        torch.save(model.state_dict(), "./models/best_mushroom_roulette.pth")
+        torch.save(model.state_dict(), "./models/resnet50_fine_tuned_mushroom_roulette.pth")
     else:
         print("\n")
 

@@ -16,13 +16,13 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Hyperparameters
-batch_size = 64
+batch_size = 32
 epochs = 30
 
 # Radical changes to training data to fight overfitting
 train_transform = transforms.Compose([
     # Random zooms and cropping of images
-    transforms.RandomResizedCrop(224, scale=(0.8, 1.0)),
+    transforms.RandomResizedCrop(299, scale=(0.8, 1.0)),
 
     # 50% chance to mirror the image
     transforms.RandomHorizontalFlip(p=0.5),
@@ -35,15 +35,16 @@ train_transform = transforms.Compose([
 
     transforms.ToTensor(),
 
-    # Shift colors to fit ResNet50 training data values
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    # Google's strict -1 to 1 color shift for Xception
+    transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
 ])
 
-# Modify test images just enough to be compatible with ResNet50
+# Modify test images just enough to be compatible with Xception
 test_transform = transforms.Compose([
-    transforms.Resize((224, 224)),
+    transforms.Resize(333),
+    transforms.CenterCrop(299),
     transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
 ])
 
 full_train_dataset = torchvision.datasets.ImageFolder(root='./data/raw_mushrooms/MO_94/', transform=train_transform)
@@ -75,7 +76,7 @@ print("Initializing and compiling model...\n")
 model = transfer_model(num_classes=94).to(device=device)
 
 print("Loading weights from highest accuracy model from training...")
-saved_state_dict = torch.load("./models/best_mushroom_roulette.pth", weights_only=True)
+saved_state_dict = torch.load("./models/xception_best_mushroom_roulette.pth", weights_only=True)
 
 # Clean weight names from torch.compile prefixes
 clean_state_dict = {}
@@ -107,10 +108,12 @@ print(f"Start training on {device} ({torch.cuda.get_device_name(0)})\n")
 start_time = time.time()
 
 # Current highest accuracy from non-fine-tuned model
-best_accuracy = 63.61
+best_accuracy = 62.90
 
 for epoch in range(epochs):
-    model.train()
+    model.eval()
+    model.get_classifier().train() # Only head into training mode
+
     running_loss = 0.0
 
     for i, (inputs, labels) in enumerate(train_loader):
@@ -158,7 +161,7 @@ for epoch in range(epochs):
     if test_accuracy > best_accuracy:
         best_accuracy = test_accuracy
         print("New best accuracy! Saving model...\n")
-        torch.save(model.state_dict(), "./models/fine_tuned_mushroom_roulette.pth")
+        torch.save(model.state_dict(), "./models/xception_fine_tuned_mushroom_roulette.pth")
     else:
         print("\n")
 
