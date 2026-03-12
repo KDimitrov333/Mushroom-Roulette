@@ -17,13 +17,13 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Hyperparameters
-    batch_size = 32
+    batch_size = 64
     epochs = 30
 
     # Radical changes to training data to fight overfitting
     train_transform = transforms.Compose([
         # Random zooms and cropping of images
-        transforms.RandomResizedCrop(299, scale=(0.8, 1.0)),
+        transforms.RandomResizedCrop(224, scale=(0.8, 1.0)),
 
         # 50% chance to mirror the image
         transforms.RandomHorizontalFlip(p=0.5),
@@ -36,16 +36,15 @@ def main():
 
         transforms.ToTensor(),
 
-        # Google's strict -1 to 1 color shift for Xception
-        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+        # Shift colors to fit ResNet50 training data values
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
-    # Modify test images just enough to be compatible with Xception
+    # Modify test images just enough to be compatible with ResNet50
     test_transform = transforms.Compose([
-        transforms.Resize(333),
-        transforms.CenterCrop(299),
+        transforms.Resize((224, 224)),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
     full_train_dataset = torchvision.datasets.ImageFolder(root='./data/raw_mushrooms/MO_94/', transform=train_transform)
@@ -96,9 +95,7 @@ def main():
     best_accuracy = 0.0
 
     for epoch in range(epochs):
-        model.eval()
-        model.get_classifier().train() # Only head into training mode
-        
+        model.train()
         running_loss = 0.0
 
         for i, (inputs, labels) in enumerate(train_loader):
@@ -146,7 +143,7 @@ def main():
         if test_accuracy > best_accuracy:
             best_accuracy = test_accuracy
             print("New best accuracy! Saving model...\n")
-            torch.save(model.state_dict(), "./models/xception_best_mushroom_roulette.pth")
+            torch.save(model.state_dict(), "./models/resnet50_multi_class_best_mushroom_roulette.pth")
         else:
             print("\n")
 

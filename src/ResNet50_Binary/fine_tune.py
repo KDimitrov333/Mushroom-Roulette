@@ -9,7 +9,7 @@ from torch.utils.data import Subset
 from PIL import ImageFile
 import time
 
-from model import transfer_model
+from model import transfer_model, defrost_top_layers
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -17,13 +17,13 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Hyperparameters
-    batch_size = 32
+    batch_size = 64
     epochs = 30
 
     # Radical changes to training data to fight overfitting
     train_transform = transforms.Compose([
         # Random zooms and cropping of images
-        transforms.RandomResizedCrop(299, scale=(0.8, 1.0)),
+        transforms.RandomResizedCrop(224, scale=(0.8, 1.0)),
 
         # 50% chance to mirror the image
         transforms.RandomHorizontalFlip(p=0.5),
@@ -36,20 +36,19 @@ def main():
 
         transforms.ToTensor(),
 
-        # Google's strict -1 to 1 color shift for Xception
-        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+        # Shift colors to fit ResNet50 training data values
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
-    # Modify test images just enough to be compatible with Xception
+    # Modify test images just enough to be compatible with ResNet50
     test_transform = transforms.Compose([
-        transforms.Resize(333),
-        transforms.CenterCrop(299),
+        transforms.Resize((224, 224)),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
-    full_train_dataset = torchvision.datasets.ImageFolder(root='./data/raw_mushrooms/MO_94/', transform=train_transform)
-    full_test_dataset = torchvision.datasets.ImageFolder(root='./data/raw_mushrooms/MO_94/', transform=test_transform)
+    full_train_dataset = torchvision.datasets.ImageFolder(root='./data/binary_mushrooms/', transform=train_transform)
+    full_test_dataset = torchvision.datasets.ImageFolder(root='./data/binary_mushrooms/', transform=test_transform)
 
     num_data = len(full_train_dataset)
     train_size = int(0.8 * num_data)
@@ -74,10 +73,24 @@ def main():
                             num_workers=4, pin_memory=True, persistent_workers=True)
 
     print("Initializing and compiling model...\n")
-    model = transfer_model(num_classes=94).to(device=device)
+    model = transfer_model(num_classes=2).to(device=device)
 
-    # Pass only final layer parameters to optimizer
-    optimizer = optim.AdamW(model.fc.parameters(), lr=0.001)
+    print("Loading weights from highest accuracy model from training...")
+    saved_state_dict = torch.load("./models/resnet50_binary_best_mushroom_roulette.pth", weights_only=True)
+
+    # Clean weight names from torch.compile prefixes
+    clean_state_dict = {}
+    for key, value in saved_state_dict.items():
+        clean_key = key.replace('_orig_mod.', '')
+        clean_state_dict[clean_key] = value
+
+    model.load_state_dict(clean_state_dict)
+
+    # Unfreeze top layer
+    model = defrost_top_layers(model)
+
+    # Pass final + unfrozen layer parameters to optimizer; lower learning rate
+    optimizer = optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=0.00005)
 
     # Lower learning rate as accuracy gains slow down
     scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=2)
@@ -93,12 +106,12 @@ def main():
 
     print(f"Start training on {device} ({torch.cuda.get_device_name(0)})\n")
     start_time = time.time()
-    best_accuracy = 0.0
+
+    # Current highest accuracy from non-fine-tuned model
+    best_accuracy = 81.18
 
     for epoch in range(epochs):
-        model.eval()
-        model.get_classifier().train() # Only head into training mode
-        
+        model.train()
         running_loss = 0.0
 
         for i, (inputs, labels) in enumerate(train_loader):
@@ -146,7 +159,7 @@ def main():
         if test_accuracy > best_accuracy:
             best_accuracy = test_accuracy
             print("New best accuracy! Saving model...\n")
-            torch.save(model.state_dict(), "./models/xception_best_mushroom_roulette.pth")
+            torch.save(model.state_dict(), "./models/resnet50_binary_fine_tuned_mushroom_roulette.pth")
         else:
             print("\n")
 
