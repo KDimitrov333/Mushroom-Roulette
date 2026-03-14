@@ -22,20 +22,10 @@ def main():
 
     # Radical changes to training data to fight overfitting
     train_transform = transforms.Compose([
-        # Random zooms and cropping of images
-        transforms.RandomResizedCrop(128, scale=(0.8, 1.0)),
-
+        transforms.Resize((128, 128)),
         # 50% chance to mirror the image
         transforms.RandomHorizontalFlip(p=0.5),
-
-        # Random rotation of image up to 30 degrees
-        transforms.RandomRotation(degrees=30),
-
-        # Mess with lighting
-        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
-
         transforms.ToTensor(),
-
         # Standard Normalization
         transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
     ])
@@ -77,7 +67,7 @@ def main():
     optimizer = optim.AdamW(model.parameters(), lr=0.001)
 
     # Lower learning rate as accuracy gains slow down
-    scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=2)
+    scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=5)
 
     # Compile model for your GPU's hardware layout
     model = torch.compile(model, mode="reduce-overhead")
