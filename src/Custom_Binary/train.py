@@ -22,7 +22,7 @@ def main():
 
     # Radical changes to training data to fight overfitting
     train_transform = transforms.Compose([
-        transforms.Resize((128, 128)),
+        transforms.Resize((224, 224)),
         # 50% chance to mirror the image
         transforms.RandomHorizontalFlip(p=0.5),
         transforms.ToTensor(),
@@ -31,7 +31,7 @@ def main():
     ])
 
     test_transform = transforms.Compose([
-        transforms.Resize((128, 128)),
+        transforms.Resize((224, 224)),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
     ])
@@ -64,7 +64,7 @@ def main():
     print("Initializing and compiling model...\n")
     model = MR().to(device)
 
-    optimizer = optim.AdamW(model.parameters(), lr=0.001)
+    optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-3)
 
     # Lower learning rate as accuracy gains slow down
     scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=5)
