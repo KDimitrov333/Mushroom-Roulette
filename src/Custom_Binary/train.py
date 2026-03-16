@@ -9,6 +9,7 @@ from torch.utils.data import Subset
 from PIL import ImageFile
 import time
 
+from sklearn.model_selection import train_test_split
 from model import MR
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -39,16 +40,18 @@ def main():
     full_train_dataset = torchvision.datasets.ImageFolder(root='./data/binary_mushrooms/', transform=train_transform)
     full_test_dataset = torchvision.datasets.ImageFolder(root='./data/binary_mushrooms/', transform=test_transform)
 
-    num_data = len(full_train_dataset)
-    train_size = int(0.8 * num_data)
+    targets = full_train_dataset.targets
 
-    # Random list of index numbers; lock seed for consistency
-    generator = torch.Generator().manual_seed(67)
-    indices = torch.randperm(num_data, generator=generator).tolist()
+    # Stratified Sampling to ensure safe/unsafe distribution is identical for both training and testing
+    train_indices, test_indices = train_test_split(
+        list(range(len(targets))),
+        test_size=0.2,
+        stratify=targets,
+        random_state=67
+    )
 
-    # Separate training data from test data
-    train_dataset = Subset(full_train_dataset, indices[:train_size])
-    test_dataset = Subset(full_test_dataset, indices[train_size:])
+    train_dataset = Subset(full_train_dataset, train_indices)
+    test_dataset = Subset(full_test_dataset, test_indices)
 
     # CPU Optimizations to avoid data bottlenecks
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, 
