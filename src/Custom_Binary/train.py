@@ -26,6 +26,8 @@ def main():
         transforms.Resize((224, 224)),
         # 50% chance to mirror the image
         transforms.RandomHorizontalFlip(p=0.5),
+        # Slight rotation to reduce model overfitting
+        transforms.RandomRotation(degrees=15),
         transforms.ToTensor(),
         # Standard Normalization
         transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
@@ -67,7 +69,7 @@ def main():
     print("Initializing and compiling model...\n")
     model = MR().to(device)
 
-    optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-3)
+    optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-4)
 
     # Predetermined smooth curve to lower learning rate as training continues
     # eta_min is the absolute lowest the learning rate will go
