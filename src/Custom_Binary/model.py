@@ -1,8 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.optim as optim
-from torchvision import datasets, transforms
 
 # The custom Mushroom-Roulette Model
 class MR(nn.Module):
@@ -22,6 +20,12 @@ class MR(nn.Module):
         self.bn4 = nn.BatchNorm2d(256)
 
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
+
+        self.res1 = nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, padding=1)
+        self.bn_res1 = nn.BatchNorm2d(256)
+
+        self.res2 = nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, padding=1)
+        self.bn_res2 = nn.BatchNorm2d(256)
         
         # Global Average Pooling to fight overfitting
         self.gap = nn.AdaptiveAvgPool2d((1, 1))
@@ -36,21 +40,36 @@ class MR(nn.Module):
         x = self.bn1(x)
         x = F.relu(x)
         x = self.pool(x)
+
         # Conv Layer 2
         x = self.conv2(x)
         x = self.bn2(x)
         x = F.relu(x)
         x = self.pool(x)
+
         # Conv Layer 3
         x = self.conv3(x)
         x = self.bn3(x)
         x = F.relu(x)
         x = self.pool(x)
+
         # Conv Layer 4
         x = self.conv4(x)
         x = self.bn4(x)
         x = F.relu(x)
         x = self.pool(x)
+
+        # Residual Layer 1
+        identity = x
+        out = self.res1(x)
+        out = self.bn_res1(out)
+        x = F.relu(identity + out)
+
+        # Residual Layer 2
+        identity = x
+        out = self.res2(x)
+        out = self.bn_res2(out)
+        x = F.relu(identity + out)
 
         # GAP Layer
         x = self.gap(x)
