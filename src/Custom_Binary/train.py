@@ -69,8 +69,9 @@ def main():
 
     optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-3)
 
-    # Lower learning rate as accuracy gains slow down
-    scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=5)
+    # Predetermined smooth curve to lower learning rate as training continues
+    # eta_min is the absolute lowest the learning rate will go
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6)
 
     # Compile model for your GPU's hardware layout
     model = torch.compile(model, mode="reduce-overhead")
@@ -142,7 +143,7 @@ def main():
         else:
             print("\n")
 
-        scheduler.step(test_accuracy)
+        scheduler.step()
 
         current_lr = optimizer.param_groups[0]['lr']
         print(f"Current Learning Rate for next epoch: {current_lr:.6f}\n")
