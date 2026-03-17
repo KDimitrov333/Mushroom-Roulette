@@ -19,7 +19,7 @@ def main():
 
     # Hyperparameters
     batch_size = 64
-    epochs = 50
+    epochs = 75
 
     # Radical changes to training data to fight overfitting
     train_transform = transforms.Compose([

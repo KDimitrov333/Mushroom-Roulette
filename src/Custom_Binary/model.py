@@ -41,44 +41,44 @@ class MR(nn.Module):
         # Conv Layer 1
         x = self.conv1(x)
         x = self.bn1(x)
-        x = F.relu(x)
+        x = F.silu(x)
         x = self.pool(x)
 
         # Conv Layer 2
         x = self.conv2(x)
         x = self.bn2(x)
-        x = F.relu(x)
+        x = F.silu(x)
         x = self.pool(x)
 
         # Conv Layer 3
         x = self.conv3(x)
         x = self.bn3(x)
-        x = F.relu(x)
+        x = F.silu(x)
         x = self.pool(x)
 
         # Conv Layer 4
         x = self.conv4(x)
         x = self.bn4(x)
-        x = F.relu(x)
+        x = F.silu(x)
         x = self.pool(x)
 
         # Residual Layer 1
         identity = x
         out = self.res1(x)
         out = self.bn_res1(out)
-        x = F.relu(identity + out)
+        x = F.silu(identity + out)
 
         # Residual Layer 2
         identity = x
         out = self.res2(x)
         out = self.bn_res2(out)
-        x = F.relu(identity + out)
+        x = F.silu(identity + out)
 
         # Residual Layer 3
         identity = x
         out = self.res3(x)
         out = self.bn_res3(out)
-        x = F.relu(identity + out)
+        x = F.silu(identity + out)
 
         # GAP Layer
         x = self.gap(x)
