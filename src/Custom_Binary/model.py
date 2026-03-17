@@ -26,6 +26,9 @@ class MR(nn.Module):
 
         self.res2 = nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, padding=1)
         self.bn_res2 = nn.BatchNorm2d(256)
+
+        self.res3 = nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, padding=1)
+        self.bn_res3 = nn.BatchNorm2d(256)
         
         # Global Average Pooling to fight overfitting
         self.gap = nn.AdaptiveAvgPool2d((1, 1))
@@ -69,6 +72,12 @@ class MR(nn.Module):
         identity = x
         out = self.res2(x)
         out = self.bn_res2(out)
+        x = F.relu(identity + out)
+
+        # Residual Layer 3
+        identity = x
+        out = self.res3(x)
+        out = self.bn_res3(out)
         x = F.relu(identity + out)
 
         # GAP Layer
